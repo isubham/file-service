@@ -43,5 +43,21 @@ const getFile = async (fileId) => {
   }
 
 }
-export { saveFile, getFiles, getFile };
 
+const searchFiles = async (searchKey, limit, offset) => {
+  try {
+
+    console.log(`fileDB | searchFiles searchKey ${searchKey} limit ${limit} offset ${offset}`);
+
+    const query = `SELECT * FROM files WHERE name LIKE $1 LIMIT $2 OFFSET $3`;
+
+    const result = await storageDatabase.query(query, [`%${searchKey}%`, limit, offset]);
+    console.log('fileDB | searchFiles', result);
+
+    return result?.rows;
+  } catch (e) {
+    console.log('error getting file', e);
+  }
+}
+
+export { saveFile, getFiles, getFile, searchFiles };

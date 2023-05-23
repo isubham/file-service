@@ -5,16 +5,14 @@ import { getFilesOfFolder, getRelatedUrl, sha256 } from "./utils.js";
 import { diskLocation } from "./config.js";
 import httpStatus from "http-status";
 import path from 'path';
-import { getAllFiles, getFileService, ingestAllFiles, saveFileService } from './file.service.js';
+import * as fileService from './file.service.js';
 import { v4 } from "uuid";
 import fs from 'fs';
 import mime from 'mime-types';
 
 const fileRouter = express.Router();
 
-fileRouter.use('/file', express.static(diskLocation));
-
-fileRouter.post('/', upload.single('filecontent'), async function (req, res) {
+fileRouter.post('/upload', upload.single('filecontent'), async function (req, res) {
     try {
         console.log('route /| req.file', req.file);
         console.log('route /| req.file.mv', req.file.mv);
@@ -24,7 +22,7 @@ fileRouter.post('/', upload.single('filecontent'), async function (req, res) {
         const fileLocation = req.file.path;
         console.log('route /| diskLocation', fileLocation);
         const file = { location: fileLocation, name: path.basename(fileLocation), id: v4() };
-        await saveFileService(file)
+        await fileService.saveFileService(file)
         const createdFile = {
             ...file, location: file.location.substr(diskLocation.length, file.length)
         };
@@ -39,23 +37,7 @@ fileRouter.post('/', upload.single('filecontent'), async function (req, res) {
 });
 
 
-
-fileRouter.post('/clone', async function (req, res) {
-
-    try {
-
-        console.log('route /upload | req.body', req.body);
-        const { link, filename } = req.body;
-        await downloadAsync(link, diskLocation, filename);
-        res.send({ message: "file downloaded" });
-    } catch (e) {
-        console.log(e);
-        res.send(e);
-    }
-});
-
-
-fileRouter.get('/buckets', function (req, res) {
+fileRouter.get('/folders', function (req, res) {
     try {
         const files = getFilesOfFolder(diskLocation);
         res.send(files);
@@ -72,7 +54,7 @@ fileRouter.get('/', async function (req, res) {
         const orderBy = (req?.query?.orderBy) || 'id';
         const order = (req?.query?.order) || 'ASC';
 
-        const files = await getAllFiles(orderBy, order, page * pageSize, pageSize);
+        const files = await fileService.getAllFiles(orderBy, order, page * pageSize, pageSize);
         res.send(files);
     } catch (e) {
         console.log(e);
@@ -82,7 +64,7 @@ fileRouter.get('/', async function (req, res) {
 
 fileRouter.post('/ingest', async function (req, res) {
     try {
-        const files = await ingestAllFiles();
+        const files = await fileService.ingestAllFiles();
         res.send(files);
     } catch (e) {
         console.log(e);
@@ -92,39 +74,39 @@ fileRouter.post('/ingest', async function (req, res) {
 
 
 
-fileRouter.get('/health', function (req, res) {
-    try {
-        console.log('health api');
-        res.send({
-            data: 'hii from s-file-service',
-            controls: {
-                getFiles: getRelatedUrl("/"),
-            }
-        });
-    } catch (e) {
-        console.log(e);
-        res.status(httpStatus.INTERNAL_SERVER_ERROR).send();
-    }
-});
 
 
-fileRouter.get('/:fileId', async function (req, res) {
+
+fileRouter.get('/download/:fileId/', async function (req, res) {
     try {
 
         const fileId = req.params.fileId;
         const range = req.headers.range;
         console.log('range', range);
 
-        const file = await getFileService(fileId);
+        const file = await fileService.getFileService(fileId);
+
+        const fileStream = fs.createReadStream(path.join(diskLocation, file.location));
+        fileStream.pipe(res);
+    } catch (e) {
+        console.log(e);
+        res.status(httpStatus.INTERNAL_SERVER_ERROR).send();
+    }
+});
+
+fileRouter.get('/stream/:fileId/', async function (req, res) {
+    try {
+        const fileId = req.params.fileId;
+        const range = req.headers.range;
+        console.log('range', range);
+
+        const file = await fileService.getFileService(fileId);
         // download whole file
         if (!range) {
-
-            const fileStream = fs.createReadStream(path.join(diskLocation, file.location));
-            fileStream.pipe(res);
+            res.send(httpStatus.UNPROCESSABLE_ENTITY).send({ error: 'provide range header' })
         }
-
-        // send parts for streaming purpose
         else {
+
 
             const CHUNK_SIZE = 10 ** 6;
             const start = Number(range.replace(/\D/g, ""));
@@ -151,7 +133,40 @@ fileRouter.get('/:fileId', async function (req, res) {
     }
 });
 
+fileRouter.get('/search/:searchKey', async function (req, res) {
+    try {
+        const page = parseInt(req?.query?.page) || 0;
+        const pageSize = (parseInt(req?.query?.pageSize)) || 20;
 
+        const searchKey = req.params.searchKey || '';
+
+        const files = await fileService.searchFiles(searchKey, pageSize, page);
+        res.send(files);
+    } catch (e) {
+        console.log(e);
+        res.status(httpStatus.INTERNAL_SERVER_ERROR).send();
+    }
+});
+
+fileRouter.get('/health', function (req, res) {
+    try {
+        console.log('health api');
+        res.send({
+            data: 'hii from s-file-service',
+            controls: {
+                upload: getRelatedUrl("/upload"),
+                getFile: getRelatedUrl("/your-fileId"),
+                getFiles: getRelatedUrl("/"),
+                download: getRelatedUrl("/download/your-fileId"),
+                stream: getRelatedUrl("/stream/your-fileId"),
+                search: getRelatedUrl("/search/your-fileId"),
+            }
+        });
+    } catch (e) {
+        console.log(e);
+        res.status(httpStatus.INTERNAL_SERVER_ERROR).send();
+    }
+});
 
 export { fileRouter };
 

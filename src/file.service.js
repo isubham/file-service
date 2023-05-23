@@ -3,7 +3,7 @@ import { FileIterator } from "./file.js";
 import { diskLocation } from "./config.js";
 import path from "path";
 import fs from 'fs';
-import { saveFile, getFiles, getFile } from "./file.db.js";
+import * as fileDB from "./file.db.js";
 
 
 const downloadAsync = async (link, diskLocation, filename) => {
@@ -26,7 +26,7 @@ const getAllFilesFromFS = () => {
 };
 
 const getAllFiles = async (orderBy = 'id', order = 'ASC', offset = 0, limit = 20) => {
-  return await getFiles(orderBy, order, limit, offset);
+  return await fileDB.getFiles(orderBy, order, limit, offset);
 }
 
 
@@ -38,7 +38,7 @@ const ingestAllFiles = async () => {
 
   for (let file of allFiles) {
     // if (counter < 20) {
-    const result = await saveFile(file);
+    const result = await fileDB.saveFile(file);
     console.log(' file saved', result)
     counter += 1;
     // }
@@ -49,15 +49,20 @@ const ingestAllFiles = async () => {
 
 const saveFileService = async (file) => {
 
-  const result = await saveFile(file);
+  const result = await fileDB.saveFile(file);
   console.log(' file saved', result)
   return result;
 };
 
 const getFileService = async (fileId) => {
-  const file = await getFile(fileId);
-  return file
+  const file = await fileDB.getFile(fileId);
+  return file;
 }
 
-export { downloadAsync, getAllFilesFromFS, ingestAllFiles, saveFileService, getAllFiles, getFileService };
+const searchFiles = async (searchKey, pageSize, page) => {
+  return await fileDB.searchFiles(searchKey, pageSize, page * pageSize);
+}
+
+
+export { downloadAsync, getAllFilesFromFS, ingestAllFiles, saveFileService, getAllFiles, getFileService, searchFiles };
 
