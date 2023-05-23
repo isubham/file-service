@@ -30,6 +30,18 @@ const getFiles = async (orderBy, order, limit, offset) => {
 
 };
 
+const getFile = async (fileId) => {
+  try {
 
-export { saveFile, getFiles };
+    const query = `SELECT * FROM files WHERE id = $1`;
+
+    const result = await storageDatabase.query(query, [fileId]);
+
+    return result.rows[0];
+  } catch (e) {
+    console.log('error getting file', e);
+  }
+
+}
+export { saveFile, getFiles, getFile };
 

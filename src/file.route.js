@@ -5,8 +5,10 @@ import { getFilesOfFolder, getRelatedUrl, sha256 } from "./utils.js";
 import { diskLocation } from "./config.js";
 import httpStatus from "http-status";
 import path from 'path';
-import { getAllFiles, ingestAllFiles, saveFileService } from './file.service.js';
+import { getAllFiles, getFileService, ingestAllFiles, saveFileService } from './file.service.js';
 import { v4 } from "uuid";
+import fs from 'fs';
+import mime from 'mime-types';
 
 const fileRouter = express.Router();
 
@@ -105,6 +107,49 @@ fileRouter.get('/health', function (req, res) {
     }
 });
 
+
+fileRouter.get('/:fileId', async function (req, res) {
+    try {
+
+        const fileId = req.params.fileId;
+        const range = req.headers.range;
+        console.log('range', range);
+
+        const file = await getFileService(fileId);
+        // download whole file
+        if (!range) {
+
+            const fileStream = fs.createReadStream(path.join(diskLocation, file.location));
+            fileStream.pipe(res);
+        }
+
+        // send parts for streaming purpose
+        else {
+
+            const CHUNK_SIZE = 10 ** 6;
+            const start = Number(range.replace(/\D/g, ""));
+            const fileSize = fs.statSync(path.join(diskLocation, file.location)).size
+            const end = Math.min(start + CHUNK_SIZE, fileSize - 1);
+            const contentLength = end - start + 1;
+
+            const mimeType = mime.lookup(path.basename(file.location), "audio/mp3");
+            const headers = {
+                "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+                "Accept-Ranges": "bytes",
+                "Content-Length": contentLength,
+                "Content-Type": mimeType,
+            };
+            res.writeHead(httpStatus.PARTIAL_CONTENT, headers);
+
+            const fileStream = fs.createReadStream(path.join(diskLocation, file.location), { start, end });
+            fileStream.pipe(res);
+        }
+
+    } catch (e) {
+        console.log(e);
+        res.status(httpStatus.INTERNAL_SERVER_ERROR).send();
+    }
+});
 
 
 

@@ -2,7 +2,8 @@
 import { FileIterator } from "./file.js";
 import { diskLocation } from "./config.js";
 import path from "path";
-import { saveFile, getFiles } from "./file.db.js";
+import fs from 'fs';
+import { saveFile, getFiles, getFile } from "./file.db.js";
 
 
 const downloadAsync = async (link, diskLocation, filename) => {
@@ -53,6 +54,10 @@ const saveFileService = async (file) => {
   return result;
 };
 
+const getFileService = async (fileId) => {
+  const file = await getFile(fileId);
+  return file
+}
 
-export { downloadAsync, getAllFilesFromFS, ingestAllFiles, saveFileService, getAllFiles };
+export { downloadAsync, getAllFilesFromFS, ingestAllFiles, saveFileService, getAllFiles, getFileService };
 
